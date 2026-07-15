@@ -1,0 +1,146 @@
+#!/bin/bash
+set -eu
+
+APP_ID="dev.lizardbyte.app.Sunshine"
+SERVICE_FILE="/userdata/system/services/sunshine"
+CONFIG_DIR="/userdata/saves/flatpak/data/.var/app/${APP_ID}/config/sunshine"
+CONFIG_FILE="${CONFIG_DIR}/sunshine.conf"
+SUNSHINE_LOG="${CONFIG_DIR}/sunshine.log"
+SERVICE_LOG="/userdata/system/logs/sunshine.log"
+ORIGIN=""
+AUTO_YES=0
+
+usage() {
+    cat <<USAGE
+Usage: sunshine-csrf-setup [--origin URL] [-y]
+
+Without --origin, the helper reads the latest blocked origin from Sunshine's logs.
+USAGE
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --origin)
+            [ "$#" -ge 2 ] || { echo "Missing value for --origin" >&2; exit 1; }
+            ORIGIN="$2"; shift
+            ;;
+        -y|--yes) AUTO_YES=1 ;;
+        -h|--help) usage; exit 0 ;;
+        *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
+    esac
+    shift
+done
+
+find_origin() {
+    local file origin
+    for file in "${SUNSHINE_LOG}" "${SERVICE_LOG}"; do
+        [ -f "${file}" ] || continue
+        origin=$(grep 'CSRF protection blocked request from origin:' "${file}" 2>/dev/null \
+            | tail -n 1 \
+            | sed 's/^.*origin: //' \
+            | tr -d '\r')
+        if [ -n "${origin:-}" ]; then
+            printf '%s\n' "${origin}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+validate_origin() {
+    case "$1" in
+        https://*:*|http://*:*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+confirm() {
+    [ "${AUTO_YES}" -eq 1 ] && return 0
+    [ -r /dev/tty ] || return 1
+    printf 'Add this trusted origin to Sunshine? [y/N] ' > /dev/tty
+    IFS= read -r answer < /dev/tty || answer=""
+    case "${answer}" in y|Y|yes|YES) return 0 ;; *) return 1 ;; esac
+}
+
+add_origin() {
+    local origin="$1" current="" new_value tmp
+    tmp="${CONFIG_FILE}.tmp.$$"
+
+    mkdir -p "${CONFIG_DIR}"
+    touch "${CONFIG_FILE}"
+    current=$(sed -n 's/^[[:space:]]*csrf_allowed_origins[[:space:]]*=[[:space:]]*//p' "${CONFIG_FILE}" | tail -n 1)
+
+    case ",${current}," in
+        *",${origin},"*)
+            echo "Origin is already allowed: ${origin}"
+            return 0
+            ;;
+    esac
+
+    if [ -n "${current}" ]; then
+        new_value="${current}, ${origin}"
+    else
+        new_value="${origin}"
+    fi
+
+    awk -v value="${new_value}" '
+        BEGIN { replaced=0 }
+        /^[[:space:]]*csrf_allowed_origins[[:space:]]*=/ {
+            if (!replaced) {
+                print "csrf_allowed_origins = " value
+                replaced=1
+            }
+            next
+        }
+        { print }
+        END {
+            if (!replaced) print "csrf_allowed_origins = " value
+        }
+    ' "${CONFIG_FILE}" > "${tmp}"
+    mv "${tmp}" "${CONFIG_FILE}"
+    echo "Added trusted origin: ${origin}"
+}
+
+echo "Sunshine CSRF Setup for Batocera"
+echo ""
+
+if [ -z "${ORIGIN}" ]; then
+    ORIGIN=$(find_origin || true)
+fi
+
+if [ -z "${ORIGIN}" ]; then
+    echo "No blocked origin was found in Sunshine's logs."
+    echo ""
+    echo "Open the Sunshine Web UI, reproduce the CSRF error once, then run this helper again."
+    echo "You may also supply the exact origin manually:"
+    echo "  $0 --origin https://CLIENT-IP:47990"
+    exit 1
+fi
+
+if ! validate_origin "${ORIGIN}"; then
+    echo "The value is not a complete HTTP(S) origin with a port:" >&2
+    echo "  ${ORIGIN}" >&2
+    exit 1
+fi
+
+echo "Detected blocked origin:"
+echo "  ${ORIGIN}"
+echo ""
+
+if ! confirm; then
+    echo "No changes made."
+    exit 0
+fi
+
+add_origin "${ORIGIN}"
+
+if [ -x "${SERVICE_FILE}" ]; then
+    echo "Restarting Sunshine..."
+    "${SERVICE_FILE}" restart
+else
+    flatpak kill "${APP_ID}" >/dev/null 2>&1 || true
+    echo "Sunshine was stopped. Start it again with:"
+    echo "  flatpak run ${APP_ID}"
+fi
+
+echo "Done. Reload the Sunshine Web UI."

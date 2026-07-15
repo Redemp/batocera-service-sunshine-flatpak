@@ -1,0 +1,96 @@
+#!/bin/bash
+
+APP_ID="dev.lizardbyte.app.Sunshine"
+PROJECT_DIR="/userdata/system/sunshine-service"
+SERVICE_FILE="/userdata/system/services/sunshine"
+SERVICE_LOG="/userdata/system/logs/sunshine.log"
+CONFIG_DIR="/userdata/saves/flatpak/data/.var/app/${APP_ID}/config/sunshine"
+SUNSHINE_LOG="${CONFIG_DIR}/sunshine.log"
+
+ok() { printf '[ OK ] %s\n' "$*"; }
+warn() { printf '[WARN] %s\n' "$*"; }
+fail() { printf '[FAIL] %s\n' "$*"; }
+
+printf 'Sunshine Flatpak Diagnostics for Batocera\n\n'
+
+if [ -f /etc/batocera-release ] || grep -qi batocera /etc/os-release 2>/dev/null; then
+    ok "Batocera detected"
+else
+    warn "Could not confirm that this is Batocera"
+fi
+
+if command -v flatpak >/dev/null 2>&1; then
+    ok "Flatpak command available"
+else
+    fail "Flatpak command not found"
+fi
+
+if flatpak info "${APP_ID}" >/dev/null 2>&1; then
+    version=$(flatpak info "${APP_ID}" 2>/dev/null | sed -n 's/^[[:space:]]*Version:[[:space:]]*//p' | head -n 1)
+    ok "Sunshine Flatpak installed${version:+ (${version})}"
+else
+    fail "Sunshine Flatpak is not installed"
+fi
+
+[ -d "${PROJECT_DIR}" ] && ok "Project directory installed" || fail "Project directory not found: ${PROJECT_DIR}"
+[ -x "${SERVICE_FILE}" ] && ok "Batocera service installed" || fail "Batocera service not installed"
+
+if command -v batocera-services >/dev/null 2>&1; then
+    if batocera-services list 2>/dev/null | grep -qi '^sunshine'; then
+        ok "SUNSHINE appears in Batocera's service list"
+    else
+        warn "SUNSHINE was not found in the service list"
+    fi
+fi
+
+if flatpak ps --columns=application 2>/dev/null | grep -Fxq "${APP_ID}"; then
+    ok "Sunshine is running"
+else
+    warn "Sunshine is not running"
+fi
+
+ip_addr=$(ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([^ ]*\).*/\1/p' | head -n 1)
+if [ -n "${ip_addr}" ]; then
+    ok "Web UI address: https://${ip_addr}:47990"
+else
+    warn "Could not determine the Batocera IPv4 address"
+fi
+
+if command -v curl >/dev/null 2>&1 && curl -kfsS --connect-timeout 3 https://127.0.0.1:47990/ >/dev/null 2>&1; then
+    ok "Sunshine Web UI responds locally on port 47990"
+else
+    warn "Sunshine Web UI did not respond locally on port 47990"
+fi
+
+[ -f "${SERVICE_LOG}" ] && ok "Service log exists: ${SERVICE_LOG}" || warn "Service log not found"
+[ -f "${SUNSHINE_LOG}" ] && ok "Sunshine log exists: ${SUNSHINE_LOG}" || warn "Sunshine log not found"
+
+log_source=""
+[ -f "${SUNSHINE_LOG}" ] && log_source="${SUNSHINE_LOG}"
+[ -z "${log_source}" ] && [ -f "${SERVICE_LOG}" ] && log_source="${SERVICE_LOG}"
+
+if [ -n "${log_source}" ]; then
+    encoder=$(grep 'Found .* encoder:' "${log_source}" 2>/dev/null | tail -n 3)
+    if [ -n "${encoder}" ]; then
+        echo ""
+        echo "Detected encoders:"
+        echo "${encoder}"
+    else
+        warn "No successful encoder summary found in the current log"
+    fi
+
+    csrf=$(grep 'CSRF protection blocked request from origin:' "${log_source}" 2>/dev/null | tail -n 1)
+    if [ -n "${csrf}" ]; then
+        echo ""
+        warn "A CSRF-blocked origin was found"
+        echo "${csrf}"
+        echo "Run: ${PROJECT_DIR}/sunshine-csrf-setup"
+    fi
+fi
+
+echo ""
+echo "Useful commands:"
+echo "  ${SERVICE_FILE} status"
+echo "  ${PROJECT_DIR}/sunshine-csrf-setup"
+echo "  tail -f ${SERVICE_LOG}"
+echo "  flatpak ps"

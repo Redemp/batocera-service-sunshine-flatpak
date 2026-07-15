@@ -1,0 +1,127 @@
+#!/bin/bash
+# Sunshine Flatpak user service for Batocera
+
+export HOME=/userdata/system
+export DISPLAY="${DISPLAY:-:0}"
+
+APP_ID="dev.lizardbyte.app.Sunshine"
+SERVICE_NAME="sunshine"
+LOG_DIR="${HOME}/logs"
+LOG_FILE="${LOG_DIR}/${SERVICE_NAME}.log"
+
+mkdir -p "${LOG_DIR}"
+
+log() {
+    printf '%s: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
+}
+
+is_installed() {
+    command -v flatpak >/dev/null 2>&1 && flatpak info "${APP_ID}" >/dev/null 2>&1
+}
+
+is_running() {
+    command -v flatpak >/dev/null 2>&1 && \
+        flatpak ps --columns=application 2>/dev/null | grep -Fxq "${APP_ID}"
+}
+
+wait_for_drm() {
+    local remaining=30
+    while [ ! -d /dev/dri ] && [ "${remaining}" -gt 0 ]; do
+        sleep 1
+        remaining=$((remaining - 1))
+    done
+}
+
+start_sunshine() {
+    exec >>"${LOG_FILE}" 2>&1
+    log "Starting ${SERVICE_NAME}"
+
+    if ! command -v flatpak >/dev/null 2>&1; then
+        log "ERROR: Flatpak is not available."
+        return 1
+    fi
+
+    if ! is_installed; then
+        log "ERROR: Sunshine Flatpak is not installed (${APP_ID})."
+        log "Install it from Batocera's Flatpak Manager first."
+        return 1
+    fi
+
+    if is_running; then
+        log "Sunshine is already running."
+        return 0
+    fi
+
+    wait_for_drm
+    log "Launching ${APP_ID} with DISPLAY=${DISPLAY}"
+    flatpak run "${APP_ID}" &
+    local launcher_pid=$!
+
+    local remaining=15
+    while [ "${remaining}" -gt 0 ]; do
+        if is_running; then
+            log "Sunshine started successfully."
+            return 0
+        fi
+        if ! kill -0 "${launcher_pid}" 2>/dev/null; then
+            break
+        fi
+        sleep 1
+        remaining=$((remaining - 1))
+    done
+
+    if is_running; then
+        log "Sunshine started successfully."
+        return 0
+    fi
+
+    log "ERROR: Sunshine exited during startup. See ${LOG_FILE}"
+    return 1
+}
+
+stop_sunshine() {
+    exec >>"${LOG_FILE}" 2>&1
+    log "Stopping ${SERVICE_NAME}"
+
+    if ! is_running; then
+        log "Sunshine is not running."
+        return 0
+    fi
+
+    flatpak kill "${APP_ID}" >/dev/null 2>&1 || true
+
+    local remaining=10
+    while is_running && [ "${remaining}" -gt 0 ]; do
+        sleep 1
+        remaining=$((remaining - 1))
+    done
+
+    if is_running; then
+        log "ERROR: Sunshine did not stop cleanly."
+        return 1
+    fi
+
+    log "Sunshine stopped."
+}
+
+case "${1:-}" in
+    start) start_sunshine ;;
+    stop) stop_sunshine ;;
+    restart|reload)
+        stop_sunshine || true
+        sleep 1
+        start_sunshine
+        ;;
+    status)
+        if is_running; then
+            echo "${SERVICE_NAME} is running"
+            exit 0
+        fi
+        echo "${SERVICE_NAME} is stopped"
+        exit 1
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|reload|status}"
+        exit 1
+        ;;
+esac

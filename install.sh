@@ -1,0 +1,197 @@
+#!/bin/bash
+set -eu
+
+REPO="Redemp/batocera-service-sunshine-flatpak"
+BRANCH="${SUNSHINE_SERVICE_BRANCH:-main}"
+RAW_BASE="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
+APP_ID="dev.lizardbyte.app.Sunshine"
+PROJECT_DIR="/userdata/system/sunshine-service"
+SERVICE_DIR="/userdata/system/services"
+LOG_DIR="/userdata/system/logs"
+SERVICE_FILE="${SERVICE_DIR}/sunshine"
+FILES="install.sh sunshine sunshine-csrf-setup sunshine-diagnose uninstall.sh"
+AUTO_YES=0
+INSTALL_SUNSHINE=0
+START_SERVICE=1
+
+info() { printf '%s\n' "$*"; }
+ok() { printf '[ OK ] %s\n' "$*"; }
+warn() { printf '[WARN] %s\n' "$*"; }
+fail() { printf '[FAIL] %s\n' "$*" >&2; exit 1; }
+
+usage() {
+    cat <<USAGE
+Usage: install.sh [options]
+
+Options:
+  -y, --yes                 Accept installer confirmations.
+      --install-sunshine    Install the Sunshine Flatpak when missing.
+      --no-start            Install and enable the service without starting it.
+  -h, --help                Show this help.
+
+Environment:
+  SUNSHINE_SERVICE_BRANCH   GitHub branch or tag to download (default: main).
+USAGE
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -y|--yes) AUTO_YES=1 ;;
+        --install-sunshine) INSTALL_SUNSHINE=1 ;;
+        --no-start) START_SERVICE=0 ;;
+        -h|--help) usage; exit 0 ;;
+        *) fail "Unknown option: $1" ;;
+    esac
+    shift
+done
+
+ask_yes_no() {
+    local prompt="$1"
+    local default="${2:-no}"
+    local answer=""
+
+    if [ "${AUTO_YES}" -eq 1 ]; then
+        return 0
+    fi
+
+    if [ ! -r /dev/tty ]; then
+        [ "${default}" = "yes" ]
+        return
+    fi
+
+    if [ "${default}" = "yes" ]; then
+        printf '%s [Y/n] ' "${prompt}" > /dev/tty
+    else
+        printf '%s [y/N] ' "${prompt}" > /dev/tty
+    fi
+    IFS= read -r answer < /dev/tty || answer=""
+
+    case "${answer}" in
+        y|Y|yes|YES) return 0 ;;
+        n|N|no|NO) return 1 ;;
+        '') [ "${default}" = "yes" ]; return ;;
+        *) return 1 ;;
+    esac
+}
+
+is_local_source() {
+    [ -n "${BASH_SOURCE[0]:-}" ] && \
+    [ -f "${BASH_SOURCE[0]}" ] && \
+    [ -f "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/sunshine" ]
+}
+
+fetch_files() {
+    local destination="$1"
+    local file source_dir
+    mkdir -p "${destination}"
+
+    if is_local_source; then
+        source_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+        for file in ${FILES}; do
+            cp "${source_dir}/${file}" "${destination}/${file}"
+        done
+    else
+        command -v curl >/dev/null 2>&1 || fail "curl is required for direct GitHub installation."
+        for file in ${FILES}; do
+            info "Downloading ${file}..."
+            curl -fsSL --retry 3 --connect-timeout 15 \
+                "${RAW_BASE}/${file}" -o "${destination}/${file}" \
+                || fail "Could not download ${file} from ${RAW_BASE}."
+        done
+    fi
+}
+
+install_sunshine_flatpak() {
+    info "Installing Sunshine from Flathub..."
+    if flatpak install -y flathub "${APP_ID}"; then
+        ok "Sunshine Flatpak installed"
+    else
+        fail "Sunshine could not be installed. Use Batocera's Flatpak Manager and run this installer again."
+    fi
+}
+
+get_ipv4() {
+    ip -4 route get 1.1.1.1 2>/dev/null \
+        | sed -n 's/.* src \([^ ]*\).*/\1/p' \
+        | head -n 1
+}
+
+printf '%s\n' '----------------------------------------------------'
+printf '%s\n' ' Sunshine Flatpak Service Installer for Batocera'
+printf '%s\n' '----------------------------------------------------'
+printf '\n'
+
+if [ -f /etc/batocera-release ] || grep -qi batocera /etc/os-release 2>/dev/null; then
+    ok "Batocera detected"
+else
+    fail "This installer is intended for Batocera."
+fi
+
+command -v flatpak >/dev/null 2>&1 || fail "Flatpak is not available on this Batocera installation."
+ok "Flatpak is available"
+
+if ! flatpak info "${APP_ID}" >/dev/null 2>&1; then
+    warn "Sunshine Flatpak is not installed."
+    if [ "${INSTALL_SUNSHINE}" -eq 1 ] || ask_yes_no "Install Sunshine from Flathub now?" "yes"; then
+        install_sunshine_flatpak
+    else
+        info ""
+        info "Install Sunshine from Batocera's Flatpak Manager, or run:"
+        info "  flatpak install flathub ${APP_ID}"
+        info ""
+        fail "Sunshine is required before the service can be installed."
+    fi
+else
+    ok "Sunshine Flatpak is installed"
+fi
+
+TMP_DIR=$(mktemp -d /tmp/sunshine-service.XXXXXX)
+trap 'rm -rf "${TMP_DIR}"' EXIT INT TERM
+fetch_files "${TMP_DIR}"
+
+mkdir -p "${PROJECT_DIR}" "${SERVICE_DIR}" "${LOG_DIR}"
+for file in ${FILES}; do
+    install -m 0755 "${TMP_DIR}/${file}" "${PROJECT_DIR}/${file}"
+done
+ok "Project files installed to ${PROJECT_DIR}"
+
+install -m 0755 "${PROJECT_DIR}/sunshine" "${SERVICE_FILE}"
+ok "Batocera service installed at ${SERVICE_FILE}"
+
+if command -v batocera-services >/dev/null 2>&1; then
+    if batocera-services enable sunshine >/dev/null 2>&1; then
+        ok "SUNSHINE service enabled"
+    else
+        warn "Could not enable the service automatically."
+        info "Enable SUNSHINE under MAIN MENU > SYSTEM SETTINGS > SERVICES."
+    fi
+else
+    warn "batocera-services was not found; enable SUNSHINE from the Services menu."
+fi
+
+if [ "${START_SERVICE}" -eq 1 ]; then
+    if "${SERVICE_FILE}" start; then
+        ok "Sunshine started"
+    else
+        warn "Sunshine did not start successfully."
+        info "Run: ${PROJECT_DIR}/sunshine-diagnose"
+    fi
+fi
+
+ip_addr=$(get_ipv4 || true)
+
+info ""
+info "Installation complete."
+info "Project directory: ${PROJECT_DIR}"
+info "Service file:      ${SERVICE_FILE}"
+[ -n "${ip_addr}" ] && info "Sunshine Web UI:   https://${ip_addr}:47990"
+info ""
+info "Open the Web UI and complete Sunshine's initial setup."
+info "Your browser will warn about Sunshine's self-signed certificate."
+info ""
+info "If the form reports a CSRF Protection Error:"
+info "  1. Reproduce the error once."
+info "  2. Run: ${PROJECT_DIR}/sunshine-csrf-setup"
+info ""
+info "Diagnostics: ${PROJECT_DIR}/sunshine-diagnose"
+info "Service log: ${LOG_DIR}/sunshine.log"
