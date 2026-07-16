@@ -102,9 +102,18 @@ fetch_files() {
 }
 
 install_sunshine_flatpak() {
-    info "Installing Sunshine from Flathub..."
-    if flatpak install -y flathub "${APP_ID}"; then
-        ok "Sunshine Flatpak installed"
+    info "Installing Sunshine Flatpak system-wide..."
+
+    if ! flatpak remotes --system 2>/dev/null | awk '{print $1}' | grep -qx "flathub"; then
+        fail "The system-wide Flathub remote is not configured. Open Batocera's Flatpak Manager once, then run this installer again."
+    fi
+
+    if flatpak install --system -y flathub "${APP_ID}"; then
+        if flatpak info --system "${APP_ID}" >/dev/null 2>&1; then
+            ok "Sunshine Flatpak installed system-wide"
+        else
+            fail "Flatpak reported success, but the system-wide Sunshine installation could not be verified."
+        fi
     else
         fail "Sunshine could not be installed. Use Batocera's Flatpak Manager and run this installer again."
     fi
@@ -130,19 +139,25 @@ fi
 command -v flatpak >/dev/null 2>&1 || fail "Flatpak is not available on this Batocera installation."
 ok "Flatpak is available"
 
-if ! flatpak info "${APP_ID}" >/dev/null 2>&1; then
-    warn "Sunshine Flatpak is not installed."
-    if [ "${INSTALL_SUNSHINE}" -eq 1 ] || ask_yes_no "Install Sunshine from Flathub now?" "yes"; then
+if flatpak info --system "${APP_ID}" >/dev/null 2>&1; then
+    ok "Sunshine Flatpak is installed system-wide"
+else
+    warn "Sunshine Flatpak is not installed system-wide."
+
+    if flatpak info --user "${APP_ID}" >/dev/null 2>&1; then
+        warn "A user-only Sunshine installation was detected."
+        fail "This Batocera service requires the system-wide Sunshine Flatpak. Remove the user installation and install Sunshine through Batocera's Flatpak Manager, or run: flatpak uninstall --user ${APP_ID}"
+    fi
+
+    if [ "${INSTALL_SUNSHINE}" -eq 1 ] || ask_yes_no "Install Sunshine system-wide from Flathub now?" "yes"; then
         install_sunshine_flatpak
     else
         info ""
         info "Install Sunshine from Batocera's Flatpak Manager, or run:"
-        info "  flatpak install flathub ${APP_ID}"
+        info "  flatpak install --system flathub ${APP_ID}"
         info ""
-        fail "Sunshine is required before the service can be installed."
+        fail "The system-wide Sunshine Flatpak is required before the service can be installed."
     fi
-else
-    ok "Sunshine Flatpak is installed"
 fi
 
 TMP_DIR=$(mktemp -d /tmp/sunshine-service.XXXXXX)
