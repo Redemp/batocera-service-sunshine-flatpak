@@ -15,6 +15,7 @@ INSTALL_SUNSHINE=0
 START_SERVICE=1
 
 info() { printf '%s\n' "$*"; }
+notice() { printf '[INFO] %s\n' "$*"; }
 ok() { printf '[ OK ] %s\n' "$*"; }
 warn() { printf '[WARN] %s\n' "$*"; }
 fail() { printf '[FAIL] %s\n' "$*" >&2; exit 1; }
@@ -92,8 +93,8 @@ fetch_files() {
         done
     else
         command -v curl >/dev/null 2>&1 || fail "curl is required for direct GitHub installation."
+        notice "Downloading service files from GitHub..."
         for file in ${FILES}; do
-            info "Downloading ${file}..."
             curl -fsSL --retry 3 --connect-timeout 15 \
                 "${RAW_BASE}/${file}" -o "${destination}/${file}" \
                 || fail "Could not download ${file} from ${RAW_BASE}."
@@ -180,32 +181,36 @@ if [ "${START_SERVICE}" -eq 1 ]; then
         info "Run: ${PROJECT_DIR}/sunshine-diagnose"
     fi
 else
-    info "[INFO] Sunshine was not started because --no-start was used."
+    notice "Sunshine was not started because --no-start was used."
 fi
 
 ip_addr=$(get_ipv4 || true)
 
 info ""
-info "Installation complete."
-info "Project directory: ${PROJECT_DIR}"
-info "Service file:      ${SERVICE_FILE}"
+printf '%s\n' '----------------------------------------------------'
+printf '%s\n' ' Installation complete'
+printf '%s\n' '----------------------------------------------------'
 
 if [ "${SUNSHINE_STARTED}" -eq 1 ]; then
-    [ -n "${ip_addr}" ] && info "Sunshine Web UI:   https://${ip_addr}:47990"
+    if [ -n "${ip_addr}" ]; then
+        info ""
+        info "Open the Sunshine Web UI:"
+        info "  https://${ip_addr}:47990"
+    fi
     info ""
-    info "Open the Web UI and complete Sunshine's initial setup."
-    info "Your browser will warn about Sunshine's self-signed certificate."
+    info "Complete the initial Sunshine setup in your browser."
+    info "A warning about the self-signed certificate is expected."
     info ""
-    info "If the form reports a CSRF Protection Error:"
-    info "  1. Reproduce the error once."
-    info "  2. Run: ${PROJECT_DIR}/sunshine-csrf-setup"
+    info "If Sunshine reports a CSRF Protection Error, reproduce it once and run:"
+    info "  ${PROJECT_DIR}/sunshine-csrf-setup"
 else
     info ""
-    info "Sunshine is not currently running."
+    info "Sunshine was installed but is not currently running."
     info "Start it with:"
     info "  ${SERVICE_FILE} start"
 fi
 
 info ""
-info "Diagnostics: ${PROJECT_DIR}/sunshine-diagnose"
-info "Service log: ${LOG_DIR}/sunshine.log"
+info "Troubleshooting:"
+info "  ${PROJECT_DIR}/sunshine-diagnose"
+info ""
