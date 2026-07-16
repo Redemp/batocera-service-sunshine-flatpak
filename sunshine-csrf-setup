@@ -55,11 +55,43 @@ validate_origin() {
 }
 
 confirm() {
+    local answer="" normalized="" input_source="stdin"
+
     [ "${AUTO_YES}" -eq 1 ] && return 0
-    [ -r /dev/tty ] || return 1
-    printf 'Add this trusted origin to Sunshine? [y/N] ' > /dev/tty
-    IFS= read -r answer < /dev/tty || answer=""
-    case "${answer}" in y|Y|yes|YES) return 0 ;; *) return 1 ;; esac
+
+    if [ -r /dev/tty ] && [ -w /dev/tty ]; then
+        input_source="/dev/tty"
+        printf 'Add this trusted origin to Sunshine? [y/N] ' > /dev/tty
+        if ! IFS= read -r answer < /dev/tty; then
+            echo "Failed to read confirmation from /dev/tty." >&2
+            return 2
+        fi
+    else
+        printf 'Add this trusted origin to Sunshine? [y/N] '
+        if ! IFS= read -r answer; then
+            echo "Failed to read confirmation from stdin." >&2
+            return 2
+        fi
+    fi
+
+    normalized=$(printf '%s' "${answer}" \
+        | tr -d '\r' \
+        | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
+        | tr '[:upper:]' '[:lower:]')
+
+    case "${normalized}" in
+        y|yes)
+            return 0
+            ;;
+        n|no|'')
+            return 1
+            ;;
+        *)
+            printf "Unrecognized confirmation input from %s: '%s'\n" \
+                "${input_source}" "${normalized}" >&2
+            return 2
+            ;;
+    esac
 }
 
 add_origin() {
@@ -127,10 +159,21 @@ echo "Detected blocked origin:"
 echo "  ${ORIGIN}"
 echo ""
 
-if ! confirm; then
-    echo "No changes made."
-    exit 0
-fi
+confirm_status=0
+confirm || confirm_status=$?
+
+case "${confirm_status}" in
+    0)
+        ;;
+    1)
+        echo "No changes made."
+        exit 0
+        ;;
+    *)
+        echo "Confirmation failed. No changes were made." >&2
+        exit 1
+        ;;
+esac
 
 add_origin "${ORIGIN}"
 
