@@ -8,6 +8,7 @@ APP_ID="dev.lizardbyte.app.Sunshine"
 SERVICE_NAME="sunshine"
 LOG_DIR="${HOME}/logs"
 LOG_FILE="${LOG_DIR}/${SERVICE_NAME}.log"
+WEB_UI_PORT="47990"
 
 mkdir -p "${LOG_DIR}"
 
@@ -16,12 +17,55 @@ log() {
 }
 
 is_installed() {
-    command -v flatpak >/dev/null 2>&1 && flatpak info "${APP_ID}" >/dev/null 2>&1
+    command -v flatpak >/dev/null 2>&1 && \
+        flatpak info --system "${APP_ID}" >/dev/null 2>&1
 }
 
+port_in_use() {
+    if command -v ss >/dev/null 2>&1; then
+        ss -H -tln 2>/dev/null | awk -v p=":${WEB_UI_PORT}" '($4 ~ p"$") { found=1 } END { exit !found }'
+        return $?
+    fi
+    if command -v netstat >/dev/null 2>&1; then
+        netstat -tln 2>/dev/null | awk -v p=":${WEB_UI_PORT}" '($4 ~ p"$") { found=1 } END { exit !found }'
+        return $?
+    fi
+    return 1
+}
+
+# True only for the Flatpak Sunshine app, never this service script
+# (the service file is also named "sunshine", so pgrep -x is unsafe).
 is_running() {
-    command -v flatpak >/dev/null 2>&1 && \
-        flatpak ps --columns=application 2>/dev/null | grep -Fxq "${APP_ID}"
+    if command -v flatpak >/dev/null 2>&1 && \
+        flatpak ps --columns=application 2>/dev/null | grep -Fxq "${APP_ID}"; then
+        return 0
+    fi
+
+    port_in_use
+}
+
+kill_leftover_sunshine() {
+    local pid exe
+
+    if command -v fuser >/dev/null 2>&1 && port_in_use; then
+        fuser -k "${WEB_UI_PORT}/tcp" >/dev/null 2>&1 || true
+    fi
+
+    for pid in $(pgrep -x sunshine 2>/dev/null || true); do
+        # Never kill this service script or its shell.
+        if [ "${pid}" = "$$" ] || [ "${pid}" = "${PPID}" ]; then
+            continue
+        fi
+
+        exe=$(readlink -f "/proc/${pid}/exe" 2>/dev/null || true)
+        case "${exe}" in
+            */bash|*/sh|"")
+                continue
+                ;;
+        esac
+
+        kill "${pid}" >/dev/null 2>&1 || true
+    done
 }
 
 wait_for_drm() {
@@ -42,7 +86,7 @@ start_sunshine() {
     fi
 
     if ! is_installed; then
-        log "ERROR: Sunshine Flatpak is not installed (${APP_ID})."
+        log "ERROR: Sunshine Flatpak is not installed system-wide (${APP_ID})."
         log "Install it from Batocera's Flatpak Manager first."
         return 1
     fi
@@ -54,28 +98,30 @@ start_sunshine() {
 
     wait_for_drm
     log "Launching ${APP_ID} with DISPLAY=${DISPLAY}"
-    flatpak run "${APP_ID}" &
+    flatpak run --system "${APP_ID}" &
     local launcher_pid=$!
 
-    local remaining=15
+    # Require the Web UI port, not only flatpak ps. Sunshine can appear in
+    # flatpak ps during encoder probing and then exit before binding 47990.
+    local remaining=20
     while [ "${remaining}" -gt 0 ]; do
-        if is_running; then
+        if port_in_use; then
             log "Sunshine started successfully."
             return 0
         fi
-        if ! kill -0 "${launcher_pid}" 2>/dev/null; then
+        if ! kill -0 "${launcher_pid}" 2>/dev/null && ! is_running; then
             break
         fi
         sleep 1
         remaining=$((remaining - 1))
     done
 
-    if is_running; then
+    if port_in_use; then
         log "Sunshine started successfully."
         return 0
     fi
 
-    log "ERROR: Sunshine exited during startup. See ${LOG_FILE}"
+    log "ERROR: Sunshine exited during startup or Web UI port ${WEB_UI_PORT} did not open. See ${LOG_FILE}"
     return 1
 }
 
@@ -91,6 +137,18 @@ stop_sunshine() {
     flatpak kill "${APP_ID}" >/dev/null 2>&1 || true
 
     local remaining=10
+    while is_running && [ "${remaining}" -gt 0 ]; do
+        sleep 1
+        remaining=$((remaining - 1))
+    done
+
+    if is_running; then
+        log "Flatpak kill did not clear Sunshine; forcing leftover processes to stop."
+        kill_leftover_sunshine
+        sleep 1
+    fi
+
+    remaining=5
     while is_running && [ "${remaining}" -gt 0 ]; do
         sleep 1
         remaining=$((remaining - 1))

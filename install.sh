@@ -66,6 +66,7 @@ ask_yes_no() {
         printf '%s [y/N] ' "${prompt}" > /dev/tty
     fi
     IFS= read -r answer < /dev/tty || answer=""
+    answer=$(printf '%s' "${answer}" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
     case "${answer}" in
         y|Y|yes|YES) return 0 ;;
@@ -101,12 +102,31 @@ fetch_files() {
     fi
 }
 
+has_system_flathub() {
+    flatpak remotes --system 2>/dev/null | awk '{print $1}' | grep -qx "flathub"
+}
+
+ensure_system_flathub() {
+    if has_system_flathub; then
+        return 0
+    fi
+
+    notice "System-wide Flathub remote is missing. Adding it..."
+    if flatpak remote-add --if-not-exists --system flathub \
+        https://flathub.org/repo/flathub.flatpakrepo; then
+        if has_system_flathub; then
+            ok "System-wide Flathub remote added"
+            return 0
+        fi
+    fi
+
+    fail "Could not add the system-wide Flathub remote. Add it manually with: flatpak remote-add --if-not-exists --system flathub https://flathub.org/repo/flathub.flatpakrepo"
+}
+
 install_sunshine_flatpak() {
     info "Installing Sunshine Flatpak system-wide..."
 
-    if ! flatpak remotes --system 2>/dev/null | awk '{print $1}' | grep -qx "flathub"; then
-        fail "The system-wide Flathub remote is not configured. Open Batocera's Flatpak Manager once, then run this installer again."
-    fi
+    ensure_system_flathub
 
     if flatpak install --system -y flathub "${APP_ID}"; then
         if flatpak info --system "${APP_ID}" >/dev/null 2>&1; then
@@ -213,11 +233,12 @@ if [ "${SUNSHINE_STARTED}" -eq 1 ]; then
         info "  https://${ip_addr}:47990"
     fi
     info ""
-    info "Complete the initial Sunshine setup in your browser."
+    info "Open the Web UI and create your username and password first."
     info "A warning about the self-signed certificate is expected."
     info ""
-    info "If Sunshine reports a CSRF Protection Error, reproduce it once and run:"
+    info "Only if the browser shows a CSRF Protection Error, then run:"
     info "  ${PROJECT_DIR}/sunshine-csrf-setup"
+    info "Do not run sunshine-csrf-setup before trying to log in."
 else
     info ""
     info "Sunshine was installed but is not currently running."
