@@ -39,10 +39,14 @@ curl -fL \
   https://raw.githubusercontent.com/Redemp/batocera-service-sunshine-flatpak/main/install.sh \
   -o /tmp/install-sunshine-service.sh
 
-less /tmp/install-sunshine-service.sh
+sed -n '1,240p' /tmp/install-sunshine-service.sh
 bash /tmp/install-sunshine-service.sh
 ```
 
+The `sed` command prints the installer for inspection and works reliably in Batocera's terminal.
+Press `Shift+Page Up` or use your terminal's scrollback to review earlier lines.
+
+The downloaded file does not need to be executable because it is passed directly to `bash`.
 The installer asks whether Sunshine should be installed from Flathub when it is missing.
 
 ### Quick installation
