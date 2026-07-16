@@ -177,6 +177,9 @@ Pair Moonlight with your Batocera system using the PIN displayed during the firs
 
 ## Recommended Streaming Resolutions
 
+> [!TIP]
+> Configure the streaming resolution in the **Moonlight** client. Sunshine will stream at the resolution requested by the client.
+
 For the best experience, configure Moonlight to match the display you are actually using.
 
 For modern widescreen displays, simply select your display's native resolution.
