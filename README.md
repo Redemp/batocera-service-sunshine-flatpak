@@ -148,6 +148,53 @@ https://BATOCERA-IP:47990
 
 Sunshine uses a self-signed certificate, so the browser warning is expected.
 
+
+## Moonlight Client
+
+<p align="center">
+  <img src="images/moonlight.png" alt="Moonlight" width="180">
+</p>
+
+After configuring Sunshine, connect to your Batocera system using the official **Moonlight** client.
+
+Official website:
+
+https://moonlight-stream.org/
+
+Moonlight is available for:
+
+- Windows
+- Linux
+- macOS
+- Android
+- iPhone / iPad
+- Apple TV
+- Steam Deck
+- Raspberry Pi
+- Many Smart TVs
+
+Pair Moonlight with your Batocera system using the PIN displayed during the first connection.
+
+## Recommended Streaming Resolutions
+
+For the best experience, configure Moonlight to match the display you are actually using.
+
+For modern widescreen displays, simply select your display's native resolution.
+
+For CRT televisions and CRT monitors, many retro games were originally displayed in a **4:3 aspect ratio**. Choosing a 4:3 streaming resolution avoids stretching and generally provides a more authentic presentation.
+
+### Recommended 4:3 streaming resolutions
+
+| Widescreen Resolution | Recommended 4:3 Resolution |
+|----------------------:|---------------------------:|
+| 1280×720 | **1280×960** |
+| 1920×1080 | **1440×1080** |
+| 2560×1440 | **1920×1440** |
+| 3840×2160 (4K) | **2880×2160** |
+
+These resolutions preserve the full vertical resolution while converting the image to a true 4:3 aspect ratio.
+
+
 ## CSRF Protection Error
 
 Initial account creation may be blocked when Sunshine receives an origin that is not yet trusted.
