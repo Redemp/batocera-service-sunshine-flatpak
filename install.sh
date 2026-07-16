@@ -169,13 +169,18 @@ else
     warn "batocera-services was not found; enable SUNSHINE from the Services menu."
 fi
 
+SUNSHINE_STARTED=0
+
 if [ "${START_SERVICE}" -eq 1 ]; then
     if "${SERVICE_FILE}" start; then
+        SUNSHINE_STARTED=1
         ok "Sunshine started"
     else
         warn "Sunshine did not start successfully."
         info "Run: ${PROJECT_DIR}/sunshine-diagnose"
     fi
+else
+    info "[INFO] Sunshine was not started because --no-start was used."
 fi
 
 ip_addr=$(get_ipv4 || true)
@@ -184,14 +189,23 @@ info ""
 info "Installation complete."
 info "Project directory: ${PROJECT_DIR}"
 info "Service file:      ${SERVICE_FILE}"
-[ -n "${ip_addr}" ] && info "Sunshine Web UI:   https://${ip_addr}:47990"
-info ""
-info "Open the Web UI and complete Sunshine's initial setup."
-info "Your browser will warn about Sunshine's self-signed certificate."
-info ""
-info "If the form reports a CSRF Protection Error:"
-info "  1. Reproduce the error once."
-info "  2. Run: ${PROJECT_DIR}/sunshine-csrf-setup"
+
+if [ "${SUNSHINE_STARTED}" -eq 1 ]; then
+    [ -n "${ip_addr}" ] && info "Sunshine Web UI:   https://${ip_addr}:47990"
+    info ""
+    info "Open the Web UI and complete Sunshine's initial setup."
+    info "Your browser will warn about Sunshine's self-signed certificate."
+    info ""
+    info "If the form reports a CSRF Protection Error:"
+    info "  1. Reproduce the error once."
+    info "  2. Run: ${PROJECT_DIR}/sunshine-csrf-setup"
+else
+    info ""
+    info "Sunshine is not currently running."
+    info "Start it with:"
+    info "  ${SERVICE_FILE} start"
+fi
+
 info ""
 info "Diagnostics: ${PROJECT_DIR}/sunshine-diagnose"
 info "Service log: ${LOG_DIR}/sunshine.log"
