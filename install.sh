@@ -227,10 +227,12 @@ printf '%s\n' ' Installation complete'
 printf '%s\n' '----------------------------------------------------'
 
 if [ "${SUNSHINE_STARTED}" -eq 1 ]; then
+    info ""
+    info "Open the Sunshine Web UI:"
     if [ -n "${ip_addr}" ]; then
-        info ""
-        info "Open the Sunshine Web UI:"
         info "  https://${ip_addr}:47990"
+    else
+        info "  https://BATOCERA-IP:47990"
     fi
     info ""
     info "Open the Web UI and create your username and password first."
@@ -239,14 +241,34 @@ if [ "${SUNSHINE_STARTED}" -eq 1 ]; then
     info "Only if the browser shows a CSRF Protection Error, then run:"
     info "  ${PROJECT_DIR}/sunshine-csrf-setup"
     info "Do not run sunshine-csrf-setup before trying to log in."
-else
     info ""
-    info "Sunshine was installed but is not currently running."
+    info "Troubleshooting:"
+    info "  ${PROJECT_DIR}/sunshine-diagnose"
+    info ""
+elif [ "${START_SERVICE}" -eq 0 ]; then
+    info ""
+    info "Sunshine was not started because --no-start was used."
     info "Start it with:"
     info "  ${SERVICE_FILE} start"
+    if [ -n "${ip_addr}" ]; then
+        info ""
+        info "After starting, open the Sunshine Web UI:"
+        info "  https://${ip_addr}:47990"
+    fi
+    info ""
+    info "Troubleshooting:"
+    info "  ${PROJECT_DIR}/sunshine-diagnose"
+    info ""
+else
+    info ""
+    info "Sunshine was installed, but it failed to start."
+    info "It is not ready to use yet."
+    info ""
+    info "Check why with:"
+    info "  ${PROJECT_DIR}/sunshine-diagnose"
+    info ""
+    info "Then try starting it again with:"
+    info "  ${SERVICE_FILE} start"
+    info ""
+    fail "Sunshine service start failed."
 fi
-
-info ""
-info "Troubleshooting:"
-info "  ${PROJECT_DIR}/sunshine-diagnose"
-info ""

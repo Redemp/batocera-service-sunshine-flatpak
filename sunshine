@@ -76,6 +76,92 @@ wait_for_drm() {
     done
 }
 
+# Batocera starts user services from S99 while the compositor may still be coming up.
+# Wayland builds (labwc): wait for the Wayland socket.
+# X11 builds (openbox/Xorg): wait for the X11 socket only, do not burn 90s on Wayland.
+prepare_display_env() {
+    export DISPLAY="${DISPLAY:-:0}"
+
+    if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+        if [ -d /run/user/0 ]; then
+            export XDG_RUNTIME_DIR=/run/user/0
+        else
+            export XDG_RUNTIME_DIR=/run
+        fi
+    fi
+}
+
+expects_wayland() {
+    # Batocera Wayland images ship labwc; X11 images typically do not.
+    [ -x /etc/init.d/S14labwc ] && return 0
+    [ -x /usr/bin/labwc ] && return 0
+    return 1
+}
+
+wayland_socket_ready() {
+    local socket display="${WAYLAND_DISPLAY:-wayland-0}"
+
+    for socket in \
+        "${XDG_RUNTIME_DIR}/${display}" \
+        "/run/${display}" \
+        "/run/user/0/${display}" \
+        "/tmp/${display}"
+    do
+        if [ -S "${socket}" ]; then
+            printf '%s\n' "${socket}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+x11_socket_ready() {
+    local socket
+
+    for socket in /tmp/.X11-unix/X0 /tmp/.X11-unix/X1; do
+        if [ -S "${socket}" ]; then
+            printf '%s\n' "${socket}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+wait_for_display() {
+    local remaining socket=""
+
+    prepare_display_env
+
+    if expects_wayland; then
+        export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
+        remaining=90
+        while [ "${remaining}" -gt 0 ]; do
+            if socket=$(wayland_socket_ready); then
+                log "Wayland is ready (${socket}, WAYLAND_DISPLAY=${WAYLAND_DISPLAY}, XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR})"
+                return 0
+            fi
+            sleep 1
+            remaining=$((remaining - 1))
+        done
+        log "WARNING: Wayland socket was not ready after 90s; launching anyway."
+        return 1
+    fi
+
+    # X11-only Batocera: do not set WAYLAND_DISPLAY, and do not wait for Wayland.
+    unset WAYLAND_DISPLAY || true
+    remaining=60
+    while [ "${remaining}" -gt 0 ]; do
+        if socket=$(x11_socket_ready); then
+            log "X11 is ready (${socket}, DISPLAY=${DISPLAY})"
+            return 0
+        fi
+        sleep 1
+        remaining=$((remaining - 1))
+    done
+    log "WARNING: X11 socket was not ready after 60s; launching anyway."
+    return 1
+}
+
 start_sunshine() {
     exec >>"${LOG_FILE}" 2>&1
     log "Starting ${SERVICE_NAME}"
@@ -97,7 +183,8 @@ start_sunshine() {
     fi
 
     wait_for_drm
-    log "Launching ${APP_ID} with DISPLAY=${DISPLAY}"
+    wait_for_display || true
+    log "Launching ${APP_ID} with DISPLAY=${DISPLAY} WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-unset} XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}"
     flatpak run --system "${APP_ID}" &
     local launcher_pid=$!
 
