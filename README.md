@@ -22,6 +22,7 @@ https://wiki.batocera.org/systems:flatpak
 
 ## What this project does
 
+- Adds the system-wide Flathub remote automatically when it is missing.
 - Installs Sunshine from Flathub when requested.
 - Installs a Batocera user service for starting and stopping Sunshine.
 - Enables and starts the service when possible.
@@ -43,7 +44,7 @@ curl -fL \
   && bash /tmp/install-sunshine-service.sh
 ```
 
-This is the recommended method for most users. The installer checks whether Sunshine is already installed and offers to install it from Flathub when it is missing.
+This is the recommended method for most users. The installer checks whether Sunshine is already installed, adds the system-wide Flathub remote when needed, and offers to install Sunshine from Flathub when it is missing. You do not need to open Batocera's Flatpak Manager first.
 
 The downloaded file does not need to be made executable because it is passed directly to `bash`.
 
@@ -104,7 +105,8 @@ Open **Applications**, launch **flatpak-config**, search for **Sunshine**, then 
 Sunshine may also be installed from SSH:
 
 ```bash
-flatpak install flathub dev.lizardbyte.app.Sunshine
+flatpak remote-add --if-not-exists --system flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install --system flathub dev.lizardbyte.app.Sunshine
 ```
 
 ## Installed file layout
@@ -146,7 +148,17 @@ The installer displays the detected address, usually:
 https://BATOCERA-IP:47990
 ```
 
+Use the full URL with port `47990`. Opening only `https://BATOCERA-IP` will fail.
+
 Sunshine uses a self-signed certificate, so the browser warning is expected.
+
+### First login
+
+1. Open the Web UI URL above.
+2. Accept the certificate warning.
+3. Create a username and password on the welcome / login screen.
+
+Do this login attempt first. Do **not** run `sunshine-csrf-setup` before trying to create credentials.
 
 
 ## Moonlight Client
@@ -200,9 +212,19 @@ These resolutions preserve the full vertical resolution while converting the ima
 
 ## CSRF Protection Error
 
-Initial account creation may be blocked when Sunshine receives an origin that is not yet trusted.
+Initial account creation may be blocked when Sunshine receives an origin that is not yet trusted. The browser may show a **CSRF Protection Error** toast and an Internal Server Error.
 
-First reproduce the error once in the browser, then run:
+### Important order
+
+1. Open the Web UI and try to create your username and password first.
+2. Only if CSRF blocks that attempt, run the helper below.
+3. Reload the Web UI and create the username and password again.
+
+Do **not** run `sunshine-csrf-setup` first. The helper reads the blocked origin from Sunshine's logs. That log line only exists after the browser has already been blocked once.
+
+### After CSRF appears in the browser
+
+Reproduce is already done if you just saw the error. Then run:
 
 ```bash
 /userdata/system/sunshine-service/sunshine-csrf-setup

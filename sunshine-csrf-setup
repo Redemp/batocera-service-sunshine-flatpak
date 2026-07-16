@@ -35,7 +35,7 @@ find_origin() {
     local file origin
     for file in "${SUNSHINE_LOG}" "${SERVICE_LOG}"; do
         [ -f "${file}" ] || continue
-        origin=$(grep 'CSRF protection blocked request from origin:' "${file}" 2>/dev/null \
+        origin=$(grep -a 'CSRF protection blocked request from origin:' "${file}" 2>/dev/null \
             | tail -n 1 \
             | sed 's/^.*origin: //' \
             | tr -d '\r')
