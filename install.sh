@@ -93,7 +93,6 @@ fetch_files() {
         done
     else
         command -v curl >/dev/null 2>&1 || fail "curl is required for direct GitHub installation."
-        notice "Downloading service files from GitHub..."
         for file in ${FILES}; do
             curl -fsSL --retry 3 --connect-timeout 15 \
                 "${RAW_BASE}/${file}" -o "${destination}/${file}" \
@@ -148,16 +147,17 @@ fi
 
 TMP_DIR=$(mktemp -d /tmp/sunshine-service.XXXXXX)
 trap 'rm -rf "${TMP_DIR}"' EXIT INT TERM
+
+notice "Installing Sunshine service..."
 fetch_files "${TMP_DIR}"
 
 mkdir -p "${PROJECT_DIR}" "${SERVICE_DIR}" "${LOG_DIR}"
 for file in ${FILES}; do
     install -m 0755 "${TMP_DIR}/${file}" "${PROJECT_DIR}/${file}"
 done
-ok "Project files installed to ${PROJECT_DIR}"
 
 install -m 0755 "${PROJECT_DIR}/sunshine" "${SERVICE_FILE}"
-ok "Batocera service installed at ${SERVICE_FILE}"
+ok "Sunshine service installed"
 
 if command -v batocera-services >/dev/null 2>&1; then
     if batocera-services enable sunshine >/dev/null 2>&1; then
