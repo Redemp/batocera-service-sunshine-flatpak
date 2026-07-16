@@ -138,7 +138,68 @@ MAIN MENU > SYSTEM SETTINGS > SERVICES > SUNSHINE
 
 <p align="center">
   <img src="images/services-menu-sunshine.png" alt="Sunshine enabled in Batocera Services" width="700">
+
 </p>
+
+## First-time setup
+
+After installing and enabling the service, complete the following steps:
+
+1. Open the Sunshine Web UI shown below.
+2. Accept the browser's self-signed certificate warning.
+3. Create your Sunshine username and password.
+4. If a **CSRF Protection Error** appears, continue to the CSRF section below and run:
+
+```bash
+/userdata/system/sunshine-service/sunshine-csrf-setup
+```
+
+5. Reload the page and create your username and password again.
+6. Connect using Moonlight and enter the pairing PIN displayed by Sunshine.
+
+## Setup overview
+
+```text
+Install service
+      │
+      ▼
+Enable SUNSHINE service
+      │
+      ▼
+Open Sunshine Web UI
+      │
+      ▼
+Create username/password
+      │
+      ├── Success
+      │      │
+      │      ▼
+      │   Pair Moonlight
+      │
+      └── CSRF Protection Error
+             │
+             ▼
+Run sunshine-csrf-setup
+             │
+             ▼
+Reload the Web UI
+             │
+             ▼
+Create username/password
+             │
+             ▼
+Pair Moonlight
+```
+
+## What to expect
+
+During the initial setup it is normal to see:
+
+- A browser warning about Sunshine's self-signed certificate.
+- A **CSRF Protection Error** during the first login on some Batocera systems.
+- A pairing PIN when Moonlight connects for the first time.
+
+These are expected and are part of the normal setup process.
 
 ## Sunshine Web UI
 
@@ -161,53 +222,6 @@ Sunshine uses a self-signed certificate, so the browser warning is expected.
 Do this login attempt first. Do **not** run `sunshine-csrf-setup` before trying to create credentials.
 
 
-## Moonlight Client
-
-<p align="center">
-  <img src="images/moonlight.png" alt="Moonlight" width="180">
-</p>
-
-After configuring Sunshine, connect to your Batocera system using the official **Moonlight** client.
-
-Official website:
-
-https://moonlight-stream.org/
-
-Moonlight is available for:
-
-- Windows
-- Linux
-- macOS
-- Android
-- iPhone / iPad
-- Apple TV
-- Steam Deck
-- Raspberry Pi
-- Many Smart TVs
-
-Pair Moonlight with your Batocera system using the PIN displayed during the first connection.
-
-## Recommended Streaming Resolutions
-
-> [!TIP]
-> Configure the streaming resolution in the **Moonlight** client. Sunshine will stream at the resolution requested by the client.
-
-For the best experience, configure Moonlight to match the display you are actually using.
-
-For modern widescreen displays, simply select your display's native resolution.
-
-For CRT televisions and CRT monitors, many retro games were originally displayed in a **4:3 aspect ratio**. Choosing a 4:3 streaming resolution avoids stretching and generally provides a more authentic presentation.
-
-### Recommended 4:3 streaming resolutions
-
-| Widescreen Resolution | Recommended 4:3 Resolution |
-|----------------------:|---------------------------:|
-| 1280×720 | **1280×960** |
-| 1920×1080 | **1440×1080** |
-| 2560×1440 | **1920×1440** |
-| 3840×2160 (4K) | **2880×2160** |
-
-These resolutions preserve the full vertical resolution while converting the image to a true 4:3 aspect ratio.
 
 
 ## CSRF Protection Error
@@ -246,6 +260,57 @@ A trusted origin may also be supplied manually:
 ```
 
 Do not add wildcards or untrusted addresses.
+
+## Moonlight Client
+
+<p align="center">
+  <img src="images/moonlight.png" alt="Moonlight" width="180">
+</p>
+
+After configuring Sunshine, connect to your Batocera system using the official **Moonlight** client.
+
+Official website:
+
+https://moonlight-stream.org/
+
+Moonlight is available for:
+
+- Windows
+- Linux
+- macOS
+- Android
+- iPhone / iPad
+- Apple TV
+- Steam Deck
+- Raspberry Pi
+- Many Smart TVs
+
+During the first connection, Sunshine displays a pairing PIN.
+
+Enter this PIN in Moonlight to pair the client with your Batocera system.
+
+## Recommended Streaming Resolutions
+
+> [!TIP]
+> Configure the streaming resolution in the **Moonlight** client. Sunshine will stream at the resolution requested by the client.
+
+For the best experience, configure Moonlight to match the display you are actually using.
+
+For modern widescreen displays, simply select your display's native resolution.
+
+For CRT televisions and CRT monitors, many retro games were originally displayed in a **4:3 aspect ratio**. Choosing a 4:3 streaming resolution avoids stretching and generally provides a more authentic presentation.
+
+### Recommended 4:3 streaming resolutions
+
+| Widescreen Resolution | Recommended 4:3 Resolution |
+|----------------------:|---------------------------:|
+| 1280×720 | **1280×960** |
+| 1920×1080 | **1440×1080** |
+| 2560×1440 | **1920×1440** |
+| 3840×2160 (4K) | **2880×2160** |
+
+These resolutions preserve the full vertical resolution while converting the image to a true 4:3 aspect ratio.
+
 
 ## Sunshine's additional setup script
 
