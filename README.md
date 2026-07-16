@@ -32,24 +32,22 @@ https://wiki.batocera.org/systems:flatpak
 
 ## Quick installation
 
-### Recommended: download and inspect
+### Recommended
+
+Download the installer and start it automatically:
 
 ```bash
 curl -fL \
   https://raw.githubusercontent.com/Redemp/batocera-service-sunshine-flatpak/main/install.sh \
-  -o /tmp/install-sunshine-service.sh
-
-sed -n '1,240p' /tmp/install-sunshine-service.sh
-bash /tmp/install-sunshine-service.sh
+  -o /tmp/install-sunshine-service.sh \
+  && bash /tmp/install-sunshine-service.sh
 ```
 
-The `sed` command prints the installer for inspection and works reliably in Batocera's terminal.
-Press `Shift+Page Up` or use your terminal's scrollback to review earlier lines.
+This is the recommended method for most users. The installer checks whether Sunshine is already installed and offers to install it from Flathub when it is missing.
 
-The downloaded file does not need to be executable because it is passed directly to `bash`.
-The installer asks whether Sunshine should be installed from Flathub when it is missing.
+The downloaded file does not need to be made executable because it is passed directly to `bash`.
 
-### Quick installation
+### Quick installation using a pipe
 
 ```bash
 curl -fsSL \
@@ -57,7 +55,23 @@ curl -fsSL \
   | bash
 ```
 
-The installer reads confirmations from the active terminal, so the prompt still works when the script is piped into Bash.
+This starts the installer immediately and any prompts are shown in the terminal.
+
+### Optional: inspect before running
+
+Users who prefer to review the installer first can run:
+
+```bash
+curl -fL \
+  https://raw.githubusercontent.com/Redemp/batocera-service-sunshine-flatpak/main/install.sh \
+  -o /tmp/install-sunshine-service.sh
+
+sed -n '1,240p' /tmp/install-sunshine-service.sh
+
+bash /tmp/install-sunshine-service.sh
+```
+
+The `sed` command prints the installer in the terminal. Use the terminal scrollback to review earlier lines.
 
 ### Fully automatic installation
 
@@ -67,7 +81,7 @@ curl -fsSL \
   | bash -s -- --yes --install-sunshine
 ```
 
-To install without starting Sunshine immediately:
+To install and enable the service without starting Sunshine immediately:
 
 ```bash
 curl -fsSL \
