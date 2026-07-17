@@ -6,49 +6,17 @@
 
 <h1 align="center">Sunshine Flatpak Service for Batocera</h1>
 
-<p align="center">Run the official Sunshine Flatpak automatically as a Batocera user service.</p>
+Setup is a single SSH install script: run it from another device into Batocera. Use that same device for the Sunshine Web UI and Moonlight pairing.
 
-## Official documentation
 
-This repository only handles Batocera installation, autostart, diagnostics and the Batocera-specific CSRF setup helper.
+## Before You Start
 
-For Sunshine configuration, pairing and advanced settings, use the official Sunshine documentation:
+1. Install [Moonlight](https://moonlight-stream.org/) on the device you will stream to (PC, phone, tablet, TV, etc.).
+2. Put that device on the **same network** as your Batocera machine.
 
-https://docs.lizardbyte.dev/projects/sunshine/latest/index.html
+## Install
 
-For Batocera's Flatpak Manager, use the official Batocera documentation:
-
-https://wiki.batocera.org/systems:flatpak
-
-## What this project does
-
-- Adds the system-wide Flathub remote automatically when it is missing.
-- Installs Sunshine from Flathub when requested.
-- Installs a Batocera user service for starting and stopping Sunshine.
-- Enables and starts the service when possible.
-- Keeps all project tools in `/userdata/system/sunshine-service/`.
-- Provides a guided CSRF helper that trusts only a confirmed blocked origin.
-- Provides a diagnostic tool for Flatpak, service, Web UI, logs and encoders.
-- Leaves the Sunshine Flatpak and its configuration untouched when the service integration is removed.
-
-## Quick installation
-
-### Recommended
-
-Download the installer and start it automatically:
-
-```bash
-curl -fL \
-  https://raw.githubusercontent.com/Redemp/batocera-service-sunshine-flatpak/main/install.sh \
-  -o /tmp/install-sunshine-service.sh \
-  && bash /tmp/install-sunshine-service.sh
-```
-
-This is the recommended method for most users. The installer checks whether Sunshine is already installed, adds the system-wide Flathub remote when needed, and offers to install Sunshine from Flathub when it is missing. You do not need to open Batocera's Flatpak Manager first.
-
-The downloaded file does not need to be made executable because it is passed directly to `bash`.
-
-### Quick installation using a pipe
+3. On your Moonlight device open terminal, SSH into Batocera, then run:
 
 ```bash
 curl -fsSL \
@@ -56,81 +24,137 @@ curl -fsSL \
   | bash
 ```
 
-This starts the installer immediately and any prompts are shown in the terminal.
+`install.sh` will:
 
-### Optional: inspect before running
+- Confirm Batocera and Flatpak are available
+- Install the system-wide Sunshine Flatpak from Flathub if it is missing (adds the system Flathub remote when needed)
+- Install the service scripts under `/userdata/system/sunshine-service/`
+- Install the Batocera service at `/userdata/system/services/sunshine`
+- Enable and start the service
 
-Users who prefer to review the installer first can run:
+### What success looks like in the terminal
 
-```bash
-curl -fL \
-  https://raw.githubusercontent.com/Redemp/batocera-service-sunshine-flatpak/main/install.sh \
-  -o /tmp/install-sunshine-service.sh
-
-sed -n '1,240p' /tmp/install-sunshine-service.sh
-
-bash /tmp/install-sunshine-service.sh
-```
-
-The `sed` command prints the installer in the terminal. Use the terminal scrollback to review earlier lines.
-
-### Fully automatic installation
-
-```bash
-curl -fsSL \
-  https://raw.githubusercontent.com/Redemp/batocera-service-sunshine-flatpak/main/install.sh \
-  | bash -s -- --yes --install-sunshine
-```
-
-To install and enable the service without starting Sunshine immediately:
-
-```bash
-curl -fsSL \
-  https://raw.githubusercontent.com/Redemp/batocera-service-sunshine-flatpak/main/install.sh \
-  | bash -s -- --yes --install-sunshine --no-start
-```
-
-## Install Sunshine with Batocera's Flatpak Manager
-
-Open **Applications**, launch **flatpak-config**, search for **Sunshine**, then select **Install**.
-
-<p align="center">
-  <img src="images/flatpak-manager.png" alt="Batocera Flatpak Manager launcher" width="700">
-</p>
-
-<p align="center">
-  <img src="images/flatpak-manager-sunshine.png" alt="Sunshine in Batocera Flatpak Manager" width="700">
-</p>
-
-Sunshine may also be installed from SSH:
-
-```bash
-flatpak remote-add --if-not-exists --system flathub https://flathub.org/repo/flathub.flatpakrepo
-flatpak install --system flathub dev.lizardbyte.app.Sunshine
-```
-
-## Installed file layout
+After `[ OK ] Sunshine started`, you should see output like the example below. Your terminal will print your Batocera machine's real IP (or `https://BATOCERA-IP:47990` if detection failed).
 
 ```text
-/userdata/system/sunshine-service/
-├── install.sh
-├── sunshine
-├── sunshine-csrf-setup
-├── sunshine-diagnose
-└── uninstall.sh
+----------------------------------------------------
+ Installation complete
+----------------------------------------------------
+
+Open the Sunshine Web UI:
+  https://YOUR-BATOCERA-IP:47990
 ```
 
-Batocera requires the active service file here:
+### What failure looks like in the terminal
+
+> [!CAUTION]
+> If Sunshine does not start, the terminal shows a warning first, then still prints `Installation complete`, then exits with `[FAIL]`. This means you cannot move forward. Run diagnose, fix issues, then try starting the sunshine service again.
 
 ```text
-/userdata/system/services/sunshine
+[WARN] Sunshine did not start successfully.
+Run: /userdata/system/sunshine-service/sunshine-diagnose
+
+----------------------------------------------------
+ Installation complete
+----------------------------------------------------
+
+Sunshine was installed, but it failed to start.
+It is not ready to use yet.
+
+Check why with:
+  /userdata/system/sunshine-service/sunshine-diagnose
+
+Then try starting it again with:
+  /userdata/system/services/sunshine start
+
+[FAIL] Sunshine service start failed.
 ```
 
-No files are installed in `/userdata/system/bin/`.
+4. Once Sunshine service has successfully started, open the URL from the terminal (click it, or copy it into a browser on your Moonlight device).
 
-## Enable the service
+> [!WARNING]
+> Your browser may not recognize the address and will warn that the site is unsafe. That is expected. Example in Chrome: click **Advanced**, then proceed to the site. Other browsers have a similar "advanced" / "continue" / "accept risk" step.
 
-The installer attempts to enable the service automatically. It can also be enabled manually under:
+You should now see the Sunshine Web UI Create Login Page.
+
+5. Create your username and password and click Submit. **A CSRF Protection Error on the page is expected. If you do not see an error skip to step 9**
+
+6. Only if the browser shows a CSRF Protection Error, run via SSH: 
+    - `/userdata/system/sunshine-service/sunshine-csrf-setup`
+7. Answer `y` when asked.
+
+A successful run looks like this in the terminal:
+
+```text
+Sunshine CSRF Setup for Batocera
+
+Detected blocked origin:
+  https://YOUR-BATOCERA-IP:47990
+
+Add this trusted origin to Sunshine? [y/N]
+Added trusted origin: https://YOUR-BATOCERA-IP:47990
+Restarting Sunshine...
+Done. Reload the Sunshine Web UI.
+```
+
+8. Go back to the browser, **refresh the Sunshine Web UI Create Login Page** and enter a username and password again.
+9. The page will refresh and ask you to Login using your newly created username and password.
+
+A successful login will land on the Sunshine Web UI Main Page.
+
+10. In the top menu click on `PIN`. This is where you will insert a pairing PIN number provided by Moonlight.
+11. Open the Moonlight application and click on the icon to `Add PC Manually`
+12. You will add your Batocera IP without `https://` & `:47990`. For example: https://103.24.6.234:47990 would just be `103.24.6.234`. This should then provide a PIN.
+13. Finally in Sunshine enter the PIN, make up a Name and click Send.
+
+You should now successfully have paired your Batocera machine to your Moonlight device. In Moonlight start Batocera.
+
+## Troubleshooting
+
+```bash
+/userdata/system/sunshine-service/sunshine-diagnose
+```
+
+That checks Flatpak/Sunshine install, the service files, whether Sunshine is running, whether the Web UI answers on `47990`, logs, encoders, and recent CSRF blocks.
+
+Useful follow-ups:
+
+```bash
+/userdata/system/services/sunshine status
+/userdata/system/services/sunshine start
+tail -f /userdata/system/logs/sunshine.log
+```
+
+### Install or start fails before the Web UI opens (encoder probe)
+
+On some systems (for example the **ASRock BC-250**), Sunshine can exit during encoder probing before the Web UI binds on port `47990`. Logs may show something like `Encoding of h264 is not supported` / `h264_vulkan`. This can also affect other GPUs, APUs, or dGPUs when hardware encode is missing or broken for Sunshine's probe path.
+
+It is **not** applied by the installer on purpose. Forcing software encode on machines with working NVENC/VAAPI/AMF would push encoding onto the CPU for everyone causing performance issues.
+
+If install/start fails and diagnose or the Sunshine log points at encoder failure, run this once over SSH. It creates `sunshine.conf` when missing, or adds `encoder = software` if the file already exists (without wiping other settings like CSRF origins):
+
+```bash
+CONF=/userdata/saves/flatpak/data/.var/app/dev.lizardbyte.app.Sunshine/config/sunshine/sunshine.conf
+mkdir -p "$(dirname "$CONF")"
+if [ ! -f "$CONF" ]; then
+  echo 'encoder = software' > "$CONF"
+elif ! grep -q '^[[:space:]]*encoder[[:space:]]*=' "$CONF"; then
+  echo 'encoder = software' >> "$CONF"
+fi
+```
+
+Then restart and confirm:
+
+```bash
+/userdata/system/services/sunshine restart
+/userdata/system/services/sunshine status
+```
+
+Open the Web UI again at `https://BATOCERA-IP:47990` (use your real Batocera IP).
+
+### Enable the service if needed
+
+If the installer could not enable the service automatically, it tells you to enable it here:
 
 ```text
 MAIN MENU > SYSTEM SETTINGS > SERVICES > SUNSHINE
@@ -138,156 +162,7 @@ MAIN MENU > SYSTEM SETTINGS > SERVICES > SUNSHINE
 
 <p align="center">
   <img src="images/services-menu-sunshine.png" alt="Sunshine enabled in Batocera Services" width="700">
-
 </p>
-
-## First-time setup
-
-After installing and enabling the service, complete the following steps:
-
-1. Open the Sunshine Web UI shown below.
-2. Accept the browser's self-signed certificate warning.
-3. Create your Sunshine username and password.
-4. If a **CSRF Protection Error** appears, continue to the CSRF section below and run:
-
-```bash
-/userdata/system/sunshine-service/sunshine-csrf-setup
-```
-
-5. Reload the page and create your username and password again.
-6. Connect using Moonlight and enter the pairing PIN displayed by Sunshine.
-
-## Setup overview
-
-```text
-Install service
-      │
-      ▼
-Enable SUNSHINE service
-      │
-      ▼
-Open Sunshine Web UI
-      │
-      ▼
-Create username/password
-      │
-      ├── Success
-      │      │
-      │      ▼
-      │   Pair Moonlight
-      │
-      └── CSRF Protection Error
-             │
-             ▼
-Run sunshine-csrf-setup
-             │
-             ▼
-Reload the Web UI
-             │
-             ▼
-Create username/password
-             │
-             ▼
-Pair Moonlight
-```
-
-## What to expect
-
-During the initial setup it is normal to see:
-
-- A browser warning about Sunshine's self-signed certificate.
-- A **CSRF Protection Error** during the first login on some Batocera systems.
-- A pairing PIN when Moonlight connects for the first time.
-
-These are expected and are part of the normal setup process.
-
-## Sunshine Web UI
-
-The installer displays the detected address, usually:
-
-```text
-https://BATOCERA-IP:47990
-```
-
-Use the full URL with port `47990`. Opening only `https://BATOCERA-IP` will fail.
-
-Sunshine uses a self-signed certificate, so the browser warning is expected.
-
-### First login
-
-1. Open the Web UI URL above.
-2. Accept the certificate warning.
-3. Create a username and password on the welcome / login screen.
-
-Do this login attempt first. Do **not** run `sunshine-csrf-setup` before trying to create credentials.
-
-
-
-
-## CSRF Protection Error
-
-Initial account creation may be blocked when Sunshine receives an origin that is not yet trusted. The browser may show a **CSRF Protection Error** toast and an Internal Server Error.
-
-### Important order
-
-1. Open the Web UI and try to create your username and password first.
-2. Only if CSRF blocks that attempt, run the helper below.
-3. Reload the Web UI and create the username and password again.
-
-Do **not** run `sunshine-csrf-setup` first. The helper reads the blocked origin from Sunshine's logs. That log line only exists after the browser has already been blocked once.
-
-### After CSRF appears in the browser
-
-Reproduce is already done if you just saw the error. Then run:
-
-```bash
-/userdata/system/sunshine-service/sunshine-csrf-setup
-```
-
-The helper:
-
-1. Reads the latest blocked origin from Sunshine's logs.
-2. Displays the exact origin.
-3. Asks for confirmation.
-4. Updates `sunshine.conf` without removing existing origins.
-5. Restarts Sunshine.
-
-A trusted origin may also be supplied manually:
-
-```bash
-/userdata/system/sunshine-service/sunshine-csrf-setup \
-  --origin https://192.168.1.242:47990
-```
-
-Do not add wildcards or untrusted addresses.
-
-## Moonlight Client
-
-<p align="center">
-  <img src="images/moonlight.png" alt="Moonlight" width="180">
-</p>
-
-After configuring Sunshine, connect to your Batocera system using the official **Moonlight** client.
-
-Official website:
-
-https://moonlight-stream.org/
-
-Moonlight is available for:
-
-- Windows
-- Linux
-- macOS
-- Android
-- iPhone / iPad
-- Apple TV
-- Steam Deck
-- Raspberry Pi
-- Many Smart TVs
-
-During the first connection, Sunshine displays a pairing PIN.
-
-Enter this PIN in Moonlight to pair the client with your Batocera system.
 
 ## Recommended Streaming Resolutions
 
@@ -311,99 +186,27 @@ For CRT televisions and CRT monitors, many retro games were originally displayed
 
 These resolutions preserve the full vertical resolution while converting the image to a true 4:3 aspect ratio.
 
+## Uninstall
 
-## Sunshine's additional setup script
-
-Flathub may suggest:
-
-```bash
-flatpak run --command=additional-install.sh dev.lizardbyte.app.Sunshine
-```
-
-On Batocera, parts of this generic desktop Linux script may fail because Batocera does not provide the same systemd user session and Flatpak host portal environment. Messages about `org.freedesktop.Flatpak` or `systemctl --user` are therefore possible.
-
-Do not use this command for Sunshine autostart on Batocera:
-
-```text
-systemctl --user enable app-dev.lizardbyte.app.Sunshine
-```
-
-This repository's Batocera service replaces that autostart step. Mouse, virtual gamepad, UHID and DualSense support should still be tested after pairing Moonlight.
-
-## Diagnostics
-
-Run:
-
-```bash
-/userdata/system/sunshine-service/sunshine-diagnose
-```
-
-It checks:
-
-- Batocera and Flatpak availability.
-- Sunshine installation and version.
-- Project and service installation.
-- Sunshine process state.
-- Local Web UI response on port `47990`.
-- Service and Sunshine logs.
-- Successful encoder detection.
-- Recent CSRF-blocked origins.
-
-Useful manual commands:
-
-```bash
-flatpak info dev.lizardbyte.app.Sunshine
-flatpak ps
-pgrep -af sunshine
-flatpak run dev.lizardbyte.app.Sunshine
-flatpak kill dev.lizardbyte.app.Sunshine
-/userdata/system/services/sunshine status
-tail -f /userdata/system/logs/sunshine.log
-```
-
-Sunshine's own Flatpak log is normally stored at:
-
-```text
-/userdata/saves/flatpak/data/.var/app/dev.lizardbyte.app.Sunshine/config/sunshine/sunshine.log
-```
-
-## Updating
-
-Update Sunshine through Batocera's Flatpak Manager or run:
-
-```bash
-flatpak update dev.lizardbyte.app.Sunshine
-```
-
-Run the installer again to update the Batocera service and helper scripts:
-
-```bash
-curl -fsSL \
-  https://raw.githubusercontent.com/Redemp/batocera-service-sunshine-flatpak/main/install.sh \
-  | bash
-```
-
-## Uninstalling the service integration
+Stops the service, disables it, and removes `/userdata/system/services/sunshine` plus `/userdata/system/sunshine-service/`. Leaves the Sunshine Flatpak and its config alone:
 
 ```bash
 /userdata/system/sunshine-service/uninstall.sh
 ```
 
-This removes the Batocera service and project directory. It does not remove Sunshine or its configuration.
-
-To remove Sunshine separately:
+Remove Sunshine itself:
 
 ```bash
-flatpak uninstall dev.lizardbyte.app.Sunshine
+flatpak uninstall --system dev.lizardbyte.app.Sunshine
 ```
 
-## Known limitations
+## More info
 
-- Sunshine's generic `additional-install.sh` is not fully compatible with Batocera's environment.
-- Mouse, virtual gamepad, UHID and DS5 setup may require further Batocera-specific work.
-- KMS/DRM capture and hardware encoding depend on the GPU, driver, active connector and permissions.
-- This project is community maintained and is not official Batocera or LizardByte software.
+- Sunshine docs: https://docs.lizardbyte.dev/projects/sunshine/latest/index.html
+- Batocera Flatpak: https://wiki.batocera.org/systems:flatpak
 
 ## Credits
 
-Inspired by the original `n2qz/batocera-service-sunshine` AppImage service by maximumentropy. This version uses the official Sunshine Flatpak supported through Batocera's Flatpak system.
+Inspired by `n2qz/batocera-service-sunshine` (AppImage) by maximumentropy. This version uses the official Sunshine Flatpak via Batocera's Flatpak support.
+
+License: [CC0 1.0](LICENSE)
